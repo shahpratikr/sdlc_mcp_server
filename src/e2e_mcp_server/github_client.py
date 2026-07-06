@@ -52,3 +52,21 @@ async def create_pull_request(  # noqa: PLR0913
         },
     )
     return _text_of(result)
+
+
+async def create_release(
+    session: ClientSession,
+    repository: str,
+    tag_name: str,
+    release_notes: str,
+) -> str:
+    """Create a GitHub Release (tag + notes) for completed work. PRD §3.8."""
+    result = await session.call_tool(
+        "createRelease",
+        {
+            "repository": repository,
+            "tag_name": tag_name,
+            "body": release_notes,
+        },
+    )
+    return _text_of(result)

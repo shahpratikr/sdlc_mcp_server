@@ -3,7 +3,11 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
 from e2e_mcp_server.config import Config
-from e2e_mcp_server.github_client import create_pull_request, github_session
+from e2e_mcp_server.github_client import (
+    create_pull_request,
+    create_release,
+    github_session,
+)
 
 TEST_CONFIG = Config(
     jira_mcp_url="http://localhost:9001/mcp",
@@ -72,5 +76,34 @@ def test_create_pull_request_calls_github_mcp_tool_and_links_jira_story():
             "base": "main",
             "title": "Implement PROJ-2",
             "body": "Resolves PROJ-2\n\nLinked Jira story: PROJ-2",
+        },
+    )
+
+
+def test_create_release_calls_github_mcp_tool():
+    fake_session = AsyncMock()
+    fake_content = AsyncMock()
+    fake_content.text = "Release created: v1.0.0"
+    fake_result = AsyncMock()
+    fake_result.content = [fake_content]
+    fake_session.call_tool.return_value = fake_result
+
+    async def _run():
+        return await create_release(
+            fake_session,
+            "org/repo",
+            "v1.0.0",
+            "Completed PROJ-2.",
+        )
+
+    text = asyncio.run(_run())
+
+    assert text == "Release created: v1.0.0"
+    fake_session.call_tool.assert_awaited_once_with(
+        "createRelease",
+        {
+            "repository": "org/repo",
+            "tag_name": "v1.0.0",
+            "body": "Completed PROJ-2.",
         },
     )
