@@ -71,12 +71,12 @@ lint.select = [
 
 lint.ignore = [
     # "B008",   # do not perform function calls in argument defaults
-    # "D1",     # we don't currently enforce docstrings
+    "D1",     # we don't currently enforce docstrings
     # "D417",   # we don't currently enforce docstrings
     # "D203",   # resolve incompatibility with D211
-    # "D213",   # resolve incompatibility with D212,
+    "D213",   # resolve incompatibility with D212,
     # "FBT003", # Boolean positional value in function call
-    # "S101",   # Use of assert
+    "S101",   # Use of assert
 ]
 
 [tool.ruff.lint.per-file-ignores]
