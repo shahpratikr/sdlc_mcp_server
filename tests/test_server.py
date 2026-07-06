@@ -477,3 +477,63 @@ def test_run_server_builds_and_runs_the_server():
         fake_server = fake_fastmcp_cls.return_value
         run_server(TEST_CONFIG)
         fake_server.run.assert_called_once_with()
+
+
+def test_server_exposes_update_readme_for_story_tool():
+    """PRD §3.7: server exposes a tool to update the README."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert "update_readme_for_story" in tool_names
+
+
+def test_update_readme_for_story_creates_readme_when_missing(tmp_path):
+    """PRD §3.7: README is created and reflects the implemented changes."""
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool(
+            "update_readme_for_story",
+            {
+                "issue_key": "PROJ-4",
+                "repository_path": str(tmp_path),
+                "summary": "Added the new login flow.",
+            },
+        )
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "PROJ-4" in text
+
+    readme_content = (tmp_path / "README.md").read_text(encoding="utf-8")
+    assert "## PROJ-4" in readme_content
+    assert "Added the new login flow." in readme_content
+
+
+def test_update_readme_for_story_appends_to_existing_readme(tmp_path):
+    """PRD §3.7: existing README content is preserved and appended to."""
+    readme_path = tmp_path / "README.md"
+    readme_path.write_text("# My Project\n", encoding="utf-8")
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool(
+            "update_readme_for_story",
+            {
+                "issue_key": "PROJ-5",
+                "repository_path": str(tmp_path),
+                "summary": "Fixed the logout bug.",
+            },
+        )
+
+    asyncio.run(_call())
+
+    readme_content = readme_path.read_text(encoding="utf-8")
+    assert readme_content.startswith("# My Project\n")
+    assert "## PROJ-5" in readme_content
+    assert "Fixed the logout bug." in readme_content
