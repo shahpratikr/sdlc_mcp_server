@@ -195,6 +195,30 @@ def test_schedule_story_in_sprint_delegates_to_jira_client():
     )
 
 
+def test_server_exposes_proceed_tool():
+    """Server exposes an explicit 'proceed' approval-gate tool."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert "proceed" in tool_names
+
+
+def test_proceed_tool_approves_the_story():
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool("proceed", {"issue_key": "PROJ-2"})
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "PROJ-2" in text
+
+
 def test_run_server_builds_and_runs_the_server():
     with patch("e2e_mcp_server.server.FastMCP") as fake_fastmcp_cls:
         fake_server = fake_fastmcp_cls.return_value

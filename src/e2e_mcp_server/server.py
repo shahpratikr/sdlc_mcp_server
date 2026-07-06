@@ -15,6 +15,7 @@ from e2e_mcp_server.jira_client import (
     schedule_story,
     set_story_estimate,
 )
+from e2e_mcp_server.workflow_state import WorkflowState
 
 if TYPE_CHECKING:
     from e2e_mcp_server.config import Config
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 def create_server(config: Config) -> FastMCP:
     """Build and return the MCP server instance for this run."""
     mcp_server = FastMCP("e2e-developer-workflow")
+    workflow_state = WorkflowState()  # PRD §3.3: per-run in-memory approval-gate state
 
     @mcp_server.tool()
     def ping() -> str:
@@ -78,6 +80,12 @@ def create_server(config: Config) -> FastMCP:
         """Schedule a user story into a sprint in Jira."""
         async with jira_session(config) as session:
             return await schedule_story(session, issue_key, sprint_id)
+
+    @mcp_server.tool()
+    def proceed(issue_key: str) -> str:
+        """Explicitly approve the coding stage for a user story. PRD §3.3."""
+        workflow_state.mark_proceed(issue_key)
+        return f"Approved: coding stage unblocked for '{issue_key}'"
 
     return mcp_server
 
