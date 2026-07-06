@@ -1,0 +1,107 @@
+[tool.poetry]
+name = "e2e-mcp-server"
+version = "0.1.0"
+description = "E2E Developer Workflow MCP Server: orchestrates Jira grooming, coding, testing, PR creation, docs, and release from a single problem statement."
+authors = ["Pratik Shah <shahpratikrajesh@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "e2e_mcp_server", from = "src" }]
+
+[tool.poetry.dependencies]
+mcp = "~1.28.1"
+pre-commit = "~4.6.0"
+python = "~3.14"
+typer = "~0.26.8"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "~9.1.1"
+pytest-asyncio = "~1.4.0"
+pytest-cov = "~7.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.importlinter]
+root_packages = ["src.e2e_mcp_server"]
+include_external_packages = true
+
+[tool.ruff]
+lint.select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "C90", # mccabe
+    "F",   # pyflakes
+    "I",   # isort
+    "D",   #pydocstyle
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "S",   # flake8-bandit
+    "BLE", # flake8-blind-except
+    "FBT", # flake8-boolean-trap
+    "COM", # flake8-commas
+    "T10", # flake8-debugger
+    "EM",  # flake8-errmsg
+    "EXE", # flake8-executable
+    "ISC", # flake8-implicit-str-concat
+    "ICN", # flake8-import-conventions
+    "G",   # flake8-logging-format
+    "INP", # flake8-no-pep420
+    "PIE", # flake8-pie
+    "T20", # flake8-print
+    "PYI", # flake8-pyi
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
+    "RSE", # flake8-raise
+    "RET", # flake8-return
+    "SLF", # flake8-self
+    "SIM", # flake8-simplify
+    "TID", # flake8-tidy-imports
+    "TCH", # flake8-type-checking
+    "INT", # flake8-gettext
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PGH", # pygrep-hooks
+    "PL",  # pylint
+    "TRY", # tryceratops
+    "RUF", # Ruff-specific rules
+]
+
+lint.ignore = [
+    # "B008",   # do not perform function calls in argument defaults
+    # "D1",     # we don't currently enforce docstrings
+    # "D417",   # we don't currently enforce docstrings
+    # "D203",   # resolve incompatibility with D211
+    # "D213",   # resolve incompatibility with D212,
+    # "FBT003", # Boolean positional value in function call
+    # "S101",   # Use of assert
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/__init__.py" = ["PLC0414"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.pytest.ini_options]
+addopts = ["--cov=src/e2e_mcp_server"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+omit = [
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 90
+exclude_also = [
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
