@@ -1,4 +1,4 @@
-"""Jira MCP client wrapper: session mgmt and Feature creation. PRD §3.1, §6, §7."""
+"""Jira MCP client wrapper: session mgmt and Feature creation."""
 
 from __future__ import annotations
 
@@ -44,3 +44,90 @@ async def create_feature(
     )
     content = result.content[0]
     return content.text if hasattr(content, "text") else str(content)
+
+
+def _text_of(result) -> str:
+    """Extract text content from an MCP tool call result."""
+    content = result.content[0]
+    return content.text if hasattr(content, "text") else str(content)
+
+
+async def create_story(
+    session: ClientSession,
+    project_key: str,
+    feature_key: str,
+    summary: str,
+    description: str,
+) -> str:
+    """Refine a Feature into a user story issue in Jira."""
+    result = await session.call_tool(
+        "createJiraIssue",
+        {
+            "projectKey": project_key,
+            "issueType": "Story",
+            "summary": summary,
+            "description": description,
+            "parentKey": feature_key,
+        },
+    )
+    return _text_of(result)
+
+
+async def set_story_estimate(
+    session: ClientSession,
+    issue_key: str,
+    story_points: float,
+) -> str:
+    """Write a generated story point estimate to a user story in Jira."""
+    result = await session.call_tool(
+        "updateJiraIssue",
+        {
+            "issueKey": issue_key,
+            "fields": {"storyPoints": story_points},
+        },
+    )
+    return _text_of(result)
+
+
+async def assign_story(
+    session: ClientSession,
+    issue_key: str,
+    assignee: str,
+) -> str:
+    """Assign a user story to a developer in Jira."""
+    result = await session.call_tool(
+        "updateJiraIssue",
+        {
+            "issueKey": issue_key,
+            "fields": {"assignee": assignee},
+        },
+    )
+    return _text_of(result)
+
+
+async def list_sprints(
+    session: ClientSession,
+    board_id: str,
+) -> str:
+    """Read board/sprint structure to select or confirm a target sprint."""
+    result = await session.call_tool(
+        "getSprintsForBoard",
+        {"boardId": board_id},
+    )
+    return _text_of(result)
+
+
+async def schedule_story(
+    session: ClientSession,
+    issue_key: str,
+    sprint_id: str,
+) -> str:
+    """Schedule a user story into a sprint in Jira."""
+    result = await session.call_tool(
+        "moveIssueToSprint",
+        {
+            "issueKey": issue_key,
+            "sprintId": sprint_id,
+        },
+    )
+    return _text_of(result)
