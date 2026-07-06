@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
@@ -19,6 +20,23 @@ from e2e_mcp_server.workflow_state import WorkflowState
 
 if TYPE_CHECKING:
     from e2e_mcp_server.config import Config
+
+
+def _create_git_branch(repository_path: str, branch_name: str) -> None:
+    """Create a git branch via subprocess in the selected repository. PRD §3.4."""
+    result = subprocess.run(  # noqa: S603
+        ["git", "checkout", "-b", branch_name],  # noqa: S607
+        cwd=repository_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        msg = (
+            f"Failed to create branch '{branch_name}' in '{repository_path}': "
+            f"{result.stderr.strip()}"
+        )
+        raise RuntimeError(msg)
 
 
 def create_server(config: Config) -> FastMCP:
@@ -86,6 +104,19 @@ def create_server(config: Config) -> FastMCP:
         """Explicitly approve the coding stage for a user story. PRD §3.3."""
         workflow_state.mark_proceed(issue_key)
         return f"Approved: coding stage unblocked for '{issue_key}'"
+
+    @mcp_server.tool()
+    def create_branch_for_story(
+        issue_key: str,
+        repository_path: str,
+        branch_name: str,
+    ) -> str:
+        """Create a git branch for a story's implementation once approved. PRD §3.4."""
+        workflow_state.require_approval(issue_key)
+        _create_git_branch(repository_path, branch_name)
+        return (
+            f"Created branch '{branch_name}' in '{repository_path}' for '{issue_key}'"
+        )
 
     return mcp_server
 

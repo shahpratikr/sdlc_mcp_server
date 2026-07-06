@@ -1,10 +1,14 @@
 """Tests for the Phase 1 MCP server scaffold. docs/ARCHITECTURE.md Phase 1."""
 
 import asyncio
+import os
+import subprocess
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 
 from e2e_mcp_server.config import Config
 from e2e_mcp_server.server import create_server, run_server
@@ -217,6 +221,90 @@ def test_proceed_tool_approves_the_story():
     content = result[0]
     text = content[0].text if isinstance(content, list) else content.content[0].text
     assert "PROJ-2" in text
+
+
+def test_server_exposes_create_branch_for_story_tool():
+    """PRD §3.4: server exposes a tool to create a git branch for a story."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert "create_branch_for_story" in tool_names
+
+
+def test_create_branch_for_story_blocked_without_proceed(tmp_path):
+    """PRD §3.3/§3.4: coding stage (branch creation) is blocked until 'proceed'."""
+    subprocess.run(  # noqa: S603
+        ["git", "init", str(tmp_path)],  # noqa: S607
+        check=True,
+        capture_output=True,
+    )
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool(
+            "create_branch_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": str(tmp_path),
+                "branch_name": "feature/proj-2",
+            },
+        )
+
+    with pytest.raises(ToolError, match="PROJ-2") as exc_info:
+        asyncio.run(_call())
+    assert "proceed" in str(exc_info.value)
+
+
+def test_create_branch_for_story_creates_branch_after_proceed(tmp_path):
+    """PRD §3.4: create a git branch in the selected repository once approved."""
+    subprocess.run(  # noqa: S603
+        ["git", "init", str(tmp_path)],  # noqa: S607
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "init"],  # noqa: S607
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        },
+    )
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        await server.call_tool("proceed", {"issue_key": "PROJ-2"})
+        return await server.call_tool(
+            "create_branch_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": str(tmp_path),
+                "branch_name": "feature/proj-2",
+            },
+        )
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "feature/proj-2" in text
+
+    branch_check = subprocess.run(
+        ["git", "branch", "--show-current"],  # noqa: S607
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert branch_check.stdout.strip() == "feature/proj-2"
 
 
 def test_run_server_builds_and_runs_the_server():
