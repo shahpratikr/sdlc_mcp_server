@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
 
-from e2e_mcp_server.github_client import create_pull_request, github_session
+from e2e_mcp_server.github_client import (
+    create_pull_request,
+    create_release,
+    github_session,
+)
 from e2e_mcp_server.jira_client import (
     assign_story,
     create_feature,
@@ -135,6 +139,7 @@ def create_server(config: Config) -> FastMCP:
     _register_test_verification_tools(mcp_server, workflow_state)
     _register_pull_request_tools(mcp_server, workflow_state, config)
     _register_documentation_tools(mcp_server)
+    _register_release_tools(mcp_server, config)
 
     return mcp_server
 
@@ -204,6 +209,20 @@ def _register_documentation_tools(mcp_server: FastMCP) -> None:
         """Update the repository's README to reflect a story's changes. PRD §3.7."""
         readme_path = _update_readme(repository_path, issue_key, summary)
         return f"Updated '{readme_path}' with changes for '{issue_key}'"
+
+
+def _register_release_tools(mcp_server: FastMCP, config: Config) -> None:
+    """Register the GitHub Release-creation tool onto the server. PRD §3.8."""
+
+    @mcp_server.tool()
+    async def create_release_for_completed_work(
+        repository: str,
+        tag_name: str,
+        release_notes: str,
+    ) -> str:
+        """Create a GitHub Release (tag + notes) for completed work. PRD §3.8."""
+        async with github_session(config) as session:
+            return await create_release(session, repository, tag_name, release_notes)
 
 
 def run_server(config: Config) -> None:

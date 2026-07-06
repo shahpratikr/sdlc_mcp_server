@@ -537,3 +537,54 @@ def test_update_readme_for_story_appends_to_existing_readme(tmp_path):
     assert readme_content.startswith("# My Project\n")
     assert "## PROJ-5" in readme_content
     assert "Fixed the logout bug." in readme_content
+
+
+def test_server_exposes_create_release_for_completed_work_tool():
+    """PRD §3.8: server exposes a tool to create a GitHub Release."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert "create_release_for_completed_work" in tool_names
+
+
+def test_create_release_for_completed_work_delegates_to_github_client():
+    """PRD §3.8: release (tag + notes) is created via the GitHub MCP server."""
+    server = create_server(TEST_CONFIG)
+    fake_session = AsyncMock()
+
+    @asynccontextmanager
+    async def _fake_github_session(config):
+        yield fake_session
+
+    async def _call():
+        with (
+            patch("e2e_mcp_server.server.github_session", _fake_github_session),
+            patch(
+                "e2e_mcp_server.server.create_release",
+                AsyncMock(return_value="Release created: v1.0.0"),
+            ) as fake_create_release,
+        ):
+            result = await server.call_tool(
+                "create_release_for_completed_work",
+                {
+                    "repository": "org/repo",
+                    "tag_name": "v1.0.0",
+                    "release_notes": "Completed PROJ-2.",
+                },
+            )
+            fake_create_release.assert_awaited_once_with(
+                fake_session,
+                "org/repo",
+                "v1.0.0",
+                "Completed PROJ-2.",
+            )
+        return result
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "Release created" in text
