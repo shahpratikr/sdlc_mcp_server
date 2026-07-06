@@ -42,20 +42,20 @@ def test_require_approval_passes_once_approved():
 
 
 def test_require_tests_passed_allows_when_no_run_recorded():
-    """PRD §3.5: PR gate is only enforced once a test result is on record."""
+    """PR gate is only enforced once a test result is on record."""
     state = WorkflowState()
     state.require_tests_passed("PROJ-1")
 
 
 def test_require_tests_passed_allows_when_tests_passed():
-    """PRD §3.5: PR creation proceeds once tests pass."""
+    """PR creation proceeds once tests pass."""
     state = WorkflowState()
     state.record_test_result("PROJ-1", passed=True)
     state.require_tests_passed("PROJ-1")
 
 
 def test_require_tests_passed_blocks_when_tests_failed():
-    """PRD §3.5: PR creation is blocked on a failed test run."""
+    """PR creation is blocked on a failed test run."""
     state = WorkflowState()
     state.record_test_result("PROJ-1", passed=False)
     with pytest.raises(TestGateError):
@@ -63,7 +63,7 @@ def test_require_tests_passed_blocks_when_tests_failed():
 
 
 def test_require_tests_passed_allows_when_override_recorded():
-    """PRD §3.5: an explicit developer override unblocks PR creation."""
+    """An explicit developer override unblocks PR creation."""
     state = WorkflowState()
     state.record_test_result("PROJ-1", passed=False)
     state.mark_test_override("PROJ-1")
@@ -71,7 +71,7 @@ def test_require_tests_passed_allows_when_override_recorded():
 
 
 def test_recording_new_test_result_clears_prior_override():
-    """PRD §3.5: a fresh test run resets any previous override."""
+    """A fresh test run resets any previous override."""
     state = WorkflowState()
     state.record_test_result("PROJ-1", passed=False)
     state.mark_test_override("PROJ-1")

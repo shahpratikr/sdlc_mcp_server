@@ -1,4 +1,4 @@
-"""Tests for config.py env-var loading. PRD §4 (Security, Configurability)."""
+"""Tests for config.py env-var loading."""
 
 import pytest
 
