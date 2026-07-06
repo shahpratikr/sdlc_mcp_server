@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
 
+from e2e_mcp_server.github_client import create_pull_request, github_session
 from e2e_mcp_server.jira_client import (
     assign_story,
     create_feature,
@@ -120,6 +121,7 @@ def create_server(config: Config) -> FastMCP:
         )
 
     _register_test_verification_tools(mcp_server, workflow_state)
+    _register_pull_request_tools(mcp_server, workflow_state, config)
 
     return mcp_server
 
@@ -147,6 +149,34 @@ def _register_test_verification_tools(
         """Explicitly override a failed test run to unblock PR creation. PRD §3.5."""
         workflow_state.mark_test_override(issue_key)
         return f"Test failure override recorded for '{issue_key}'"
+
+
+def _register_pull_request_tools(
+    mcp_server: FastMCP,
+    workflow_state: WorkflowState,
+    config: Config,
+) -> None:
+    """Register the PR-creation tool onto the server. PRD §3.6."""
+
+    @mcp_server.tool()
+    async def create_pull_request_for_story(
+        issue_key: str,
+        repository: str,
+        head_branch: str,
+        base_branch: str,
+        title: str,
+    ) -> str:
+        """Create a GitHub PR for a story once tests pass, linked to Jira. PRD §3.6."""
+        workflow_state.require_tests_passed(issue_key)
+        async with github_session(config) as session:
+            return await create_pull_request(
+                session,
+                repository,
+                head_branch,
+                base_branch,
+                issue_key,
+                title,
+            )
 
 
 def run_server(config: Config) -> None:

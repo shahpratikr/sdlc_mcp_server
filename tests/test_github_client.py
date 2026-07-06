@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
 from e2e_mcp_server.config import Config
-from e2e_mcp_server.github_client import github_session
+from e2e_mcp_server.github_client import create_pull_request, github_session
 
 TEST_CONFIG = Config(
     jira_mcp_url="http://localhost:9001/mcp",
@@ -41,3 +41,36 @@ def test_github_session_authenticates_with_bearer_token_and_initializes():
 
     asyncio.run(_run())
     fake_session.initialize.assert_awaited_once_with()
+
+
+def test_create_pull_request_calls_github_mcp_tool_and_links_jira_story():
+    fake_session = AsyncMock()
+    fake_content = AsyncMock()
+    fake_content.text = "PR created: #42"
+    fake_result = AsyncMock()
+    fake_result.content = [fake_content]
+    fake_session.call_tool.return_value = fake_result
+
+    async def _run():
+        return await create_pull_request(
+            fake_session,
+            "org/repo",
+            "feature/proj-2",
+            "main",
+            "PROJ-2",
+            "Implement PROJ-2",
+        )
+
+    text = asyncio.run(_run())
+
+    assert text == "PR created: #42"
+    fake_session.call_tool.assert_awaited_once_with(
+        "createPullRequest",
+        {
+            "repository": "org/repo",
+            "head": "feature/proj-2",
+            "base": "main",
+            "title": "Implement PROJ-2",
+            "body": "Resolves PROJ-2\n\nLinked Jira story: PROJ-2",
+        },
+    )

@@ -381,6 +381,97 @@ def test_override_failed_tests_unblocks_pr_gate(tmp_path):
     assert "PROJ-2" in text
 
 
+def test_server_exposes_create_pull_request_for_story_tool():
+    """PRD §3.6: server exposes a tool to create a GitHub PR for a story."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert "create_pull_request_for_story" in tool_names
+
+
+def test_create_pull_request_for_story_delegates_to_github_client():
+    """PRD §3.6: PR is created via the GitHub MCP server once tests pass."""
+    server = create_server(TEST_CONFIG)
+    fake_session = AsyncMock()
+
+    @asynccontextmanager
+    async def _fake_github_session(config):
+        yield fake_session
+
+    async def _call():
+        await server.call_tool(
+            "run_tests_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": ".",
+                "test_command": "true",
+            },
+        )
+        with (
+            patch("e2e_mcp_server.server.github_session", _fake_github_session),
+            patch(
+                "e2e_mcp_server.server.create_pull_request",
+                AsyncMock(return_value="PR created: #7"),
+            ) as fake_create_pr,
+        ):
+            result = await server.call_tool(
+                "create_pull_request_for_story",
+                {
+                    "issue_key": "PROJ-2",
+                    "repository": "org/repo",
+                    "head_branch": "feature/proj-2",
+                    "base_branch": "main",
+                    "title": "Implement PROJ-2",
+                },
+            )
+            fake_create_pr.assert_awaited_once_with(
+                fake_session,
+                "org/repo",
+                "feature/proj-2",
+                "main",
+                "PROJ-2",
+                "Implement PROJ-2",
+            )
+        return result
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "PR created" in text
+
+
+def test_create_pull_request_for_story_blocked_when_tests_failed():
+    """PRD §3.5/§3.6: PR creation is blocked after a failed, non-overridden test run."""
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        await server.call_tool(
+            "run_tests_for_story",
+            {
+                "issue_key": "PROJ-3",
+                "repository_path": ".",
+                "test_command": "false",
+            },
+        )
+        return await server.call_tool(
+            "create_pull_request_for_story",
+            {
+                "issue_key": "PROJ-3",
+                "repository": "org/repo",
+                "head_branch": "feature/proj-3",
+                "base_branch": "main",
+                "title": "Implement PROJ-3",
+            },
+        )
+
+    with pytest.raises(ToolError):
+        asyncio.run(_call())
+
+
 def test_run_server_builds_and_runs_the_server():
     with patch("e2e_mcp_server.server.FastMCP") as fake_fastmcp_cls:
         fake_server = fake_fastmcp_cls.return_value
