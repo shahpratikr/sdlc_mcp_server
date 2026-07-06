@@ -307,6 +307,80 @@ def test_create_branch_for_story_creates_branch_after_proceed(tmp_path):
     assert branch_check.stdout.strip() == "feature/proj-2"
 
 
+def test_server_exposes_test_verification_tools():
+    """PRD §3.5: server exposes tools to run tests and override a failed run."""
+    server = create_server(TEST_CONFIG)
+
+    async def _list_tools():
+        return await server.list_tools()
+
+    tools = asyncio.run(_list_tools())
+    tool_names = {tool.name for tool in tools}
+    assert {"run_tests_for_story", "override_failed_tests"}.issubset(tool_names)
+
+
+def test_run_tests_for_story_reports_pass(tmp_path):
+    """PRD §3.5: passing test run is reported back to the calling AI assistant."""
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool(
+            "run_tests_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": str(tmp_path),
+                "test_command": "true",
+            },
+        )
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "PASSED" in text
+    assert "PROJ-2" in text
+
+
+def test_run_tests_for_story_reports_failure(tmp_path):
+    """PRD §3.5: failing test run is reported back to the calling AI assistant."""
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        return await server.call_tool(
+            "run_tests_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": str(tmp_path),
+                "test_command": "false",
+            },
+        )
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "FAILED" in text
+
+
+def test_override_failed_tests_unblocks_pr_gate(tmp_path):
+    """PRD §3.5: explicit override records unblock for a story's failed run."""
+    server = create_server(TEST_CONFIG)
+
+    async def _call():
+        await server.call_tool(
+            "run_tests_for_story",
+            {
+                "issue_key": "PROJ-2",
+                "repository_path": str(tmp_path),
+                "test_command": "false",
+            },
+        )
+        return await server.call_tool("override_failed_tests", {"issue_key": "PROJ-2"})
+
+    result = asyncio.run(_call())
+    content = result[0]
+    text = content[0].text if isinstance(content, list) else content.content[0].text
+    assert "PROJ-2" in text
+
+
 def test_run_server_builds_and_runs_the_server():
     with patch("e2e_mcp_server.server.FastMCP") as fake_fastmcp_cls:
         fake_server = fake_fastmcp_cls.return_value

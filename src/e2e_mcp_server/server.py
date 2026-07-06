@@ -16,6 +16,7 @@ from e2e_mcp_server.jira_client import (
     schedule_story,
     set_story_estimate,
 )
+from e2e_mcp_server.test_runner import run_test_suite
 from e2e_mcp_server.workflow_state import WorkflowState
 
 if TYPE_CHECKING:
@@ -118,7 +119,34 @@ def create_server(config: Config) -> FastMCP:
             f"Created branch '{branch_name}' in '{repository_path}' for '{issue_key}'"
         )
 
+    _register_test_verification_tools(mcp_server, workflow_state)
+
     return mcp_server
+
+
+def _register_test_verification_tools(
+    mcp_server: FastMCP,
+    workflow_state: WorkflowState,
+) -> None:
+    """Register the test-run and override tools onto the server. PRD §3.5."""
+
+    @mcp_server.tool()
+    def run_tests_for_story(
+        issue_key: str,
+        repository_path: str,
+        test_command: str,
+    ) -> str:
+        """Run the test suite for a story and report pass/fail results. PRD §3.5."""
+        result = run_test_suite(repository_path, test_command)
+        workflow_state.record_test_result(issue_key, passed=result.passed)
+        status = "PASSED" if result.passed else "FAILED"
+        return f"Tests {status} for '{issue_key}'\n{result.output}"
+
+    @mcp_server.tool()
+    def override_failed_tests(issue_key: str) -> str:
+        """Explicitly override a failed test run to unblock PR creation. PRD §3.5."""
+        workflow_state.mark_test_override(issue_key)
+        return f"Test failure override recorded for '{issue_key}'"
 
 
 def run_server(config: Config) -> None:
