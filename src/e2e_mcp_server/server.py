@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
@@ -39,6 +40,17 @@ def _create_git_branch(repository_path: str, branch_name: str) -> None:
             f"{result.stderr.strip()}"
         )
         raise RuntimeError(msg)
+
+
+def _update_readme(repository_path: str, issue_key: str, summary: str) -> str:
+    """Append a summary of implemented changes to the repository's README. PRD §3.7."""
+    readme_path = Path(repository_path) / "README.md"
+    existing_content = (
+        readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
+    )
+    entry = f"\n## {issue_key}\n\n{summary}\n"
+    readme_path.write_text(existing_content + entry, encoding="utf-8")
+    return str(readme_path)
 
 
 def create_server(config: Config) -> FastMCP:
@@ -122,6 +134,7 @@ def create_server(config: Config) -> FastMCP:
 
     _register_test_verification_tools(mcp_server, workflow_state)
     _register_pull_request_tools(mcp_server, workflow_state, config)
+    _register_documentation_tools(mcp_server)
 
     return mcp_server
 
@@ -177,6 +190,20 @@ def _register_pull_request_tools(
                 issue_key,
                 title,
             )
+
+
+def _register_documentation_tools(mcp_server: FastMCP) -> None:
+    """Register the README update tool onto the server. PRD §3.7."""
+
+    @mcp_server.tool()
+    def update_readme_for_story(
+        issue_key: str,
+        repository_path: str,
+        summary: str,
+    ) -> str:
+        """Update the repository's README to reflect a story's changes. PRD §3.7."""
+        readme_path = _update_readme(repository_path, issue_key, summary)
+        return f"Updated '{readme_path}' with changes for '{issue_key}'"
 
 
 def run_server(config: Config) -> None:
