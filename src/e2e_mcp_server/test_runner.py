@@ -1,4 +1,4 @@
-"""Executes the project's test suite locally and reports pass/fail. PRD §3.5."""
+"""Executes the project's test suite locally and reports pass/fail."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TestRunResult:
-    """Outcome of a local test suite execution. PRD §3.5."""
+    """Outcome of a local test suite execution."""
 
     passed: bool
     output: str
 
 
 def run_test_suite(repository_path: str, test_command: str) -> TestRunResult:
-    """Run the project's test suite unsandboxed in the local environment. PRD §3.5."""
+    """Run the project's test suite unsandboxed in the local environment."""
     result = subprocess.run(  # noqa: S603
         shlex.split(test_command),
         cwd=repository_path,

@@ -39,7 +39,7 @@ async def create_pull_request(  # noqa: PLR0913
     issue_key: str,
     title: str,
 ) -> str:
-    """Create a GitHub PR linked to the originating Jira story. PRD §3.6."""
+    """Create a GitHub PR linked to the originating Jira story."""
     body = f"Resolves {issue_key}\n\nLinked Jira story: {issue_key}"
     result = await session.call_tool(
         "createPullRequest",
@@ -60,7 +60,7 @@ async def create_release(
     tag_name: str,
     release_notes: str,
 ) -> str:
-    """Create a GitHub Release (tag + notes) for completed work. PRD §3.8."""
+    """Create a GitHub Release (tag + notes) for completed work."""
     result = await session.call_tool(
         "createRelease",
         {

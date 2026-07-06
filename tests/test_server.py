@@ -50,7 +50,7 @@ def test_ping_tool_returns_pong():
 
 
 def test_server_exposes_create_feature_from_problem_statement_tool():
-    """PRD §3.1: server exposes a tool to create a Jira Feature."""
+    """Server exposes a tool to create a Jira Feature."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -95,7 +95,7 @@ def test_create_feature_from_problem_statement_delegates_to_jira_client():
 
 
 def test_server_exposes_phase_3_tools():
-    """PRD §3.2: server exposes refinement/estimation/assignment/scheduling tools."""
+    """Server exposes refinement/estimation/assignment/scheduling tools."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -224,7 +224,7 @@ def test_proceed_tool_approves_the_story():
 
 
 def test_server_exposes_create_branch_for_story_tool():
-    """PRD §3.4: server exposes a tool to create a git branch for a story."""
+    """Server exposes a tool to create a git branch for a story."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -236,7 +236,7 @@ def test_server_exposes_create_branch_for_story_tool():
 
 
 def test_create_branch_for_story_blocked_without_proceed(tmp_path):
-    """PRD §3.3/§3.4: coding stage (branch creation) is blocked until 'proceed'."""
+    """Coding stage (branch creation) is blocked until 'proceed'."""
     subprocess.run(  # noqa: S603
         ["git", "init", str(tmp_path)],  # noqa: S607
         check=True,
@@ -260,7 +260,7 @@ def test_create_branch_for_story_blocked_without_proceed(tmp_path):
 
 
 def test_create_branch_for_story_creates_branch_after_proceed(tmp_path):
-    """PRD §3.4: create a git branch in the selected repository once approved."""
+    """Create a git branch in the selected repository once approved."""
     subprocess.run(  # noqa: S603
         ["git", "init", str(tmp_path)],  # noqa: S607
         check=True,
@@ -308,7 +308,7 @@ def test_create_branch_for_story_creates_branch_after_proceed(tmp_path):
 
 
 def test_server_exposes_test_verification_tools():
-    """PRD §3.5: server exposes tools to run tests and override a failed run."""
+    """Server exposes tools to run tests and override a failed run."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -320,7 +320,7 @@ def test_server_exposes_test_verification_tools():
 
 
 def test_run_tests_for_story_reports_pass(tmp_path):
-    """PRD §3.5: passing test run is reported back to the calling AI assistant."""
+    """Passing test run is reported back to the calling AI assistant."""
     server = create_server(TEST_CONFIG)
 
     async def _call():
@@ -341,7 +341,7 @@ def test_run_tests_for_story_reports_pass(tmp_path):
 
 
 def test_run_tests_for_story_reports_failure(tmp_path):
-    """PRD §3.5: failing test run is reported back to the calling AI assistant."""
+    """Failing test run is reported back to the calling AI assistant."""
     server = create_server(TEST_CONFIG)
 
     async def _call():
@@ -361,7 +361,7 @@ def test_run_tests_for_story_reports_failure(tmp_path):
 
 
 def test_override_failed_tests_unblocks_pr_gate(tmp_path):
-    """PRD §3.5: explicit override records unblock for a story's failed run."""
+    """Explicit override records unblock for a story's failed run."""
     server = create_server(TEST_CONFIG)
 
     async def _call():
@@ -382,7 +382,7 @@ def test_override_failed_tests_unblocks_pr_gate(tmp_path):
 
 
 def test_server_exposes_create_pull_request_for_story_tool():
-    """PRD §3.6: server exposes a tool to create a GitHub PR for a story."""
+    """Server exposes a tool to create a GitHub PR for a story."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -394,7 +394,7 @@ def test_server_exposes_create_pull_request_for_story_tool():
 
 
 def test_create_pull_request_for_story_delegates_to_github_client():
-    """PRD §3.6: PR is created via the GitHub MCP server once tests pass."""
+    """PR is created via the GitHub MCP server once tests pass."""
     server = create_server(TEST_CONFIG)
     fake_session = AsyncMock()
 
@@ -445,7 +445,7 @@ def test_create_pull_request_for_story_delegates_to_github_client():
 
 
 def test_create_pull_request_for_story_blocked_when_tests_failed():
-    """PRD §3.5/§3.6: PR creation is blocked after a failed, non-overridden test run."""
+    """PR creation is blocked after a failed, non-overridden test run."""
     server = create_server(TEST_CONFIG)
 
     async def _call():
@@ -480,7 +480,7 @@ def test_run_server_builds_and_runs_the_server():
 
 
 def test_server_exposes_update_readme_for_story_tool():
-    """PRD §3.7: server exposes a tool to update the README."""
+    """Server exposes a tool to update the README."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -492,7 +492,7 @@ def test_server_exposes_update_readme_for_story_tool():
 
 
 def test_update_readme_for_story_creates_readme_when_missing(tmp_path):
-    """PRD §3.7: README is created and reflects the implemented changes."""
+    """README is created and reflects the implemented changes."""
     server = create_server(TEST_CONFIG)
 
     async def _call():
@@ -516,7 +516,7 @@ def test_update_readme_for_story_creates_readme_when_missing(tmp_path):
 
 
 def test_update_readme_for_story_appends_to_existing_readme(tmp_path):
-    """PRD §3.7: existing README content is preserved and appended to."""
+    """Existing README content is preserved and appended to."""
     readme_path = tmp_path / "README.md"
     readme_path.write_text("# My Project\n", encoding="utf-8")
     server = create_server(TEST_CONFIG)
@@ -540,7 +540,7 @@ def test_update_readme_for_story_appends_to_existing_readme(tmp_path):
 
 
 def test_server_exposes_create_release_for_completed_work_tool():
-    """PRD §3.8: server exposes a tool to create a GitHub Release."""
+    """Server exposes a tool to create a GitHub Release."""
     server = create_server(TEST_CONFIG)
 
     async def _list_tools():
@@ -552,7 +552,7 @@ def test_server_exposes_create_release_for_completed_work_tool():
 
 
 def test_create_release_for_completed_work_delegates_to_github_client():
-    """PRD §3.8: release (tag + notes) is created via the GitHub MCP server."""
+    """Release (tag + notes) is created via the GitHub MCP server."""
     server = create_server(TEST_CONFIG)
     fake_session = AsyncMock()
 

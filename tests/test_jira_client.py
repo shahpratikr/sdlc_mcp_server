@@ -1,4 +1,4 @@
-"""Tests for jira_client Feature/Story helpers. PRD §3.1, §3.2."""
+"""Tests for jira_client Feature/Story helpers."""
 
 import asyncio
 from types import SimpleNamespace

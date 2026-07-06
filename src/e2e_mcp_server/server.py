@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 def _create_git_branch(repository_path: str, branch_name: str) -> None:
-    """Create a git branch via subprocess in the selected repository. PRD §3.4."""
+    """Create a git branch via subprocess in the selected repository."""
     result = subprocess.run(  # noqa: S603
         ["git", "checkout", "-b", branch_name],  # noqa: S607
         cwd=repository_path,
@@ -47,7 +47,7 @@ def _create_git_branch(repository_path: str, branch_name: str) -> None:
 
 
 def _update_readme(repository_path: str, issue_key: str, summary: str) -> str:
-    """Append a summary of implemented changes to the repository's README. PRD §3.7."""
+    """Append a summary of implemented changes to the repository's README."""
     readme_path = Path(repository_path) / "README.md"
     existing_content = (
         readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
@@ -60,7 +60,7 @@ def _update_readme(repository_path: str, issue_key: str, summary: str) -> str:
 def create_server(config: Config) -> FastMCP:
     """Build and return the MCP server instance for this run."""
     mcp_server = FastMCP("e2e-developer-workflow")
-    workflow_state = WorkflowState()  # PRD §3.3: per-run in-memory approval-gate state
+    workflow_state = WorkflowState()  #: per-run in-memory approval-gate state
 
     @mcp_server.tool()
     def ping() -> str:
@@ -119,7 +119,7 @@ def create_server(config: Config) -> FastMCP:
 
     @mcp_server.tool()
     def proceed(issue_key: str) -> str:
-        """Explicitly approve the coding stage for a user story. PRD §3.3."""
+        """Explicitly approve the coding stage for a user story."""
         workflow_state.mark_proceed(issue_key)
         return f"Approved: coding stage unblocked for '{issue_key}'"
 
@@ -129,7 +129,7 @@ def create_server(config: Config) -> FastMCP:
         repository_path: str,
         branch_name: str,
     ) -> str:
-        """Create a git branch for a story's implementation once approved. PRD §3.4."""
+        """Create a git branch for a story's implementation once approved."""
         workflow_state.require_approval(issue_key)
         _create_git_branch(repository_path, branch_name)
         return (
@@ -148,7 +148,7 @@ def _register_test_verification_tools(
     mcp_server: FastMCP,
     workflow_state: WorkflowState,
 ) -> None:
-    """Register the test-run and override tools onto the server. PRD §3.5."""
+    """Register the test-run and override tools onto the server."""
 
     @mcp_server.tool()
     def run_tests_for_story(
@@ -156,7 +156,7 @@ def _register_test_verification_tools(
         repository_path: str,
         test_command: str,
     ) -> str:
-        """Run the test suite for a story and report pass/fail results. PRD §3.5."""
+        """Run the test suite for a story and report pass/fail results."""
         result = run_test_suite(repository_path, test_command)
         workflow_state.record_test_result(issue_key, passed=result.passed)
         status = "PASSED" if result.passed else "FAILED"
@@ -164,7 +164,7 @@ def _register_test_verification_tools(
 
     @mcp_server.tool()
     def override_failed_tests(issue_key: str) -> str:
-        """Explicitly override a failed test run to unblock PR creation. PRD §3.5."""
+        """Explicitly override a failed test run to unblock PR creation."""
         workflow_state.mark_test_override(issue_key)
         return f"Test failure override recorded for '{issue_key}'"
 
@@ -174,7 +174,7 @@ def _register_pull_request_tools(
     workflow_state: WorkflowState,
     config: Config,
 ) -> None:
-    """Register the PR-creation tool onto the server. PRD §3.6."""
+    """Register the PR-creation tool onto the server."""
 
     @mcp_server.tool()
     async def create_pull_request_for_story(
@@ -184,7 +184,7 @@ def _register_pull_request_tools(
         base_branch: str,
         title: str,
     ) -> str:
-        """Create a GitHub PR for a story once tests pass, linked to Jira. PRD §3.6."""
+        """Create a GitHub PR for a story once tests pass, linked to Jira."""
         workflow_state.require_tests_passed(issue_key)
         async with github_session(config) as session:
             return await create_pull_request(
@@ -198,7 +198,7 @@ def _register_pull_request_tools(
 
 
 def _register_documentation_tools(mcp_server: FastMCP) -> None:
-    """Register the README update tool onto the server. PRD §3.7."""
+    """Register the README update tool onto the server."""
 
     @mcp_server.tool()
     def update_readme_for_story(
@@ -206,13 +206,13 @@ def _register_documentation_tools(mcp_server: FastMCP) -> None:
         repository_path: str,
         summary: str,
     ) -> str:
-        """Update the repository's README to reflect a story's changes. PRD §3.7."""
+        """Update the repository's README to reflect a story's changes."""
         readme_path = _update_readme(repository_path, issue_key, summary)
         return f"Updated '{readme_path}' with changes for '{issue_key}'"
 
 
 def _register_release_tools(mcp_server: FastMCP, config: Config) -> None:
-    """Register the GitHub Release-creation tool onto the server. PRD §3.8."""
+    """Register the GitHub Release-creation tool onto the server."""
 
     @mcp_server.tool()
     async def create_release_for_completed_work(
@@ -220,7 +220,7 @@ def _register_release_tools(mcp_server: FastMCP, config: Config) -> None:
         tag_name: str,
         release_notes: str,
     ) -> str:
-        """Create a GitHub Release (tag + notes) for completed work. PRD §3.8."""
+        """Create a GitHub Release (tag + notes) for completed work."""
         async with github_session(config) as session:
             return await create_release(session, repository, tag_name, release_notes)
 
