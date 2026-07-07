@@ -4,7 +4,7 @@ install:
 
 .PHONY: run
 run:
-	poetry run python -m e2e_mcp_server
+	poetry run python -m e2e_mcp_server start
 
 .PHONY: test
 test:

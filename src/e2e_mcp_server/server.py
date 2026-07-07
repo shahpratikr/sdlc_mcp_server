@@ -1,66 +1,98 @@
-"""MCP server definition exposing workflow tools to the calling AI assistant."""
+"""MCP server scaffold exposing workflow tools to the calling AI assistant."""
 
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
-from e2e_mcp_server.github_client import (
-    create_pull_request,
-    create_release,
-    github_session,
+from e2e_mcp_server.content_generation import (
+    generate_feature_acceptance_criteria,
+    generate_story_acceptance_criteria_and_estimate,
+    generate_user_stories,
 )
 from e2e_mcp_server.jira_client import (
     assign_story,
     create_feature,
     create_story,
+    get_feature_acceptance_criteria,
     jira_session,
-    list_sprints,
-    schedule_story,
-    set_story_estimate,
+    project_key_from_issue_key,
+    schedule_story_into_sprint,
+    update_feature_acceptance_criteria,
+    update_story_estimate_and_acceptance_criteria,
 )
-from e2e_mcp_server.test_runner import run_test_suite
-from e2e_mcp_server.workflow_state import WorkflowState
+from e2e_mcp_server.workflow_state import (
+    FeatureNotApprovedError,
+    StoryNotProceededError,
+    WorkflowState,
+)
 
 if TYPE_CHECKING:
     from e2e_mcp_server.config import Config
 
 
+def _approve_story_set(
+    workflow_state: WorkflowState,
+    feature_key: str,
+    *,
+    regenerate: bool,
+) -> dict[str, str]:
+    """Stage 2 approval gate: approve or request regeneration of stories. PRD §3.4."""
+    if regenerate:
+        workflow_state.reject_story_set(feature_key)
+        return {"feature_key": feature_key, "status": "regeneration_requested"}
+    workflow_state.approve_story_set(feature_key)
+    return {"feature_key": feature_key, "status": "approved"}
+
+
+def _proceed(workflow_state: WorkflowState, story_key: str) -> dict[str, str]:
+    """Pre-coding approval gate: clears a story for coding. PRD §3.5."""
+    workflow_state.proceed(story_key)
+    return {"story_key": story_key, "status": "proceeded"}
+
+
+class GitBranchError(Exception):
+    """Raised when git branch creation for a user story fails. PRD §3.6."""
+
+
+def _branch_name_for_story(story_key: str) -> str:
+    """Derive the implementation branch name for a user story. PRD §3.6."""
+    return f"story/{story_key.lower()}"
+
+
 def _create_git_branch(repository_path: str, branch_name: str) -> None:
-    """Create a git branch via subprocess in the selected repository."""
+    """Create a git branch via subprocess in the selected repository. PRD §3.6."""
     result = subprocess.run(  # noqa: S603
-        ["git", "checkout", "-b", branch_name],  # noqa: S607
-        cwd=repository_path,
+        ["git", "-C", repository_path, "checkout", "-b", branch_name],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
     )
     if result.returncode != 0:
-        msg = (
-            f"Failed to create branch '{branch_name}' in '{repository_path}': "
-            f"{result.stderr.strip()}"
-        )
-        raise RuntimeError(msg)
+        msg = f"git branch creation failed: {result.stderr.strip()}"
+        raise GitBranchError(msg)
 
 
-def _update_readme(repository_path: str, issue_key: str, summary: str) -> str:
-    """Append a summary of implemented changes to the repository's README."""
-    readme_path = Path(repository_path) / "README.md"
-    existing_content = (
-        readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
-    )
-    entry = f"\n## {issue_key}\n\n{summary}\n"
-    readme_path.write_text(existing_content + entry, encoding="utf-8")
-    return str(readme_path)
+def _create_implementation_branch(
+    workflow_state: WorkflowState,
+    story_key: str,
+    repository_path: str,
+) -> dict[str, str]:
+    """Create the implementation branch for a proceeded user story. PRD §3.6."""
+    if not workflow_state.has_proceeded(story_key):
+        msg = f"Story '{story_key}' has not passed the pre-coding approval gate"
+        raise StoryNotProceededError(msg)
+    branch_name = _branch_name_for_story(story_key)
+    _create_git_branch(repository_path, branch_name)
+    return {"story_key": story_key, "branch_name": branch_name, "status": "created"}
 
 
-def create_server(config: Config) -> FastMCP:
-    """Build and return the MCP server instance for this run."""
+def create_server(config: Config) -> FastMCP:  # noqa: C901
+    """Build and return the MCP server instance for this run. R: Phase 1."""
     mcp_server = FastMCP("e2e-developer-workflow")
-    workflow_state = WorkflowState()  #: per-run in-memory approval-gate state
+    workflow_state = WorkflowState()
 
     @mcp_server.tool()
     def ping() -> str:
@@ -68,164 +100,114 @@ def create_server(config: Config) -> FastMCP:
         return "pong"
 
     @mcp_server.tool()
-    async def create_feature_from_problem_statement(
+    async def start_feature(
         problem_statement: str,
         project_key: str,
-    ) -> str:
-        """Create a Jira Feature from a problem statement in the given project."""
+        ctx: Context,
+    ) -> dict[str, str]:
+        """Stage 1: generate AC via sampling, create the Jira Feature. PRD §3.1."""
+        acceptance_criteria = await generate_feature_acceptance_criteria(
+            ctx,
+            problem_statement,
+        )
         async with jira_session(config) as session:
-            return await create_feature(session, project_key, problem_statement)
-
-    @mcp_server.tool()
-    async def refine_feature_into_stories(
-        project_key: str,
-        feature_key: str,
-        summary: str,
-        description: str,
-    ) -> str:
-        """Refine a Jira Feature into a user story issue."""
-        async with jira_session(config) as session:
-            return await create_story(
+            feature_key = await create_feature(
                 session,
                 project_key,
-                feature_key,
-                summary,
-                description,
+                problem_statement,
+                acceptance_criteria,
             )
+        return {"feature_key": feature_key, "acceptance_criteria": acceptance_criteria}
 
     @mcp_server.tool()
-    async def estimate_story(issue_key: str, story_points: float) -> str:
-        """Write a generated story point estimate to a user story."""
+    async def approve_feature_acceptance_criteria(
+        feature_key: str,
+        edited_acceptance_criteria: str | None = None,
+    ) -> dict[str, str]:
+        """Stage 1 approval gate: approve or edit feature AC. PRD §3.2."""
+        if edited_acceptance_criteria is not None:
+            async with jira_session(config) as session:
+                await update_feature_acceptance_criteria(
+                    session,
+                    feature_key,
+                    edited_acceptance_criteria,
+                )
+        workflow_state.approve_feature(feature_key)
+        return {"feature_key": feature_key, "status": "approved"}
+
+    @mcp_server.tool()
+    async def generate_stories_for_feature(
+        feature_key: str,
+        board: str,
+        sprint: str,
+        ctx: Context,
+        assignee: str | None = None,
+    ) -> dict[str, object]:
+        """Stage 2: generate, create, estimate, and schedule stories. PRD §3.3."""
+        if not workflow_state.is_feature_approved(feature_key):
+            msg = f"Feature '{feature_key}' has not passed the Stage 1 approval gate"
+            raise FeatureNotApprovedError(msg)
+        project_key = project_key_from_issue_key(feature_key)
         async with jira_session(config) as session:
-            return await set_story_estimate(session, issue_key, story_points)
+            feature_acceptance_criteria = await get_feature_acceptance_criteria(
+                session,
+                feature_key,
+            )
+            story_summaries = await generate_user_stories(
+                ctx,
+                feature_acceptance_criteria,
+            )
+            created_stories = []
+            for summary in story_summaries:
+                acceptance_criteria, story_points = (
+                    await generate_story_acceptance_criteria_and_estimate(ctx, summary)
+                )
+                story_key = await create_story(session, project_key, summary)
+                await update_story_estimate_and_acceptance_criteria(
+                    session,
+                    story_key,
+                    story_points,
+                    acceptance_criteria,
+                )
+                await schedule_story_into_sprint(session, story_key, board, sprint)
+                if assignee is not None:
+                    await assign_story(session, story_key, assignee)
+                created_stories.append(
+                    {
+                        "story_key": story_key,
+                        "summary": summary,
+                        "story_points": story_points,
+                        "acceptance_criteria": acceptance_criteria,
+                    },
+                )
+        return {"feature_key": feature_key, "stories": created_stories}
 
     @mcp_server.tool()
-    async def assign_story_to_developer(issue_key: str, assignee: str) -> str:
-        """Assign a user story to a developer in Jira."""
-        async with jira_session(config) as session:
-            return await assign_story(session, issue_key, assignee)
+    def approve_story_set(
+        feature_key: str,
+        *,
+        regenerate: bool = False,
+    ) -> dict[str, str]:
+        """Stage 2 approval gate tool wrapper. PRD §3.4."""
+        return _approve_story_set(workflow_state, feature_key, regenerate=regenerate)
 
     @mcp_server.tool()
-    async def list_board_sprints(board_id: str) -> str:
-        """Read board/sprint structure to confirm target sprint."""
-        async with jira_session(config) as session:
-            return await list_sprints(session, board_id)
+    def proceed(story_key: str) -> dict[str, str]:
+        """Pre-coding approval gate tool wrapper. PRD §3.5."""
+        return _proceed(workflow_state, story_key)
 
     @mcp_server.tool()
-    async def schedule_story_in_sprint(issue_key: str, sprint_id: str) -> str:
-        """Schedule a user story into a sprint in Jira."""
-        async with jira_session(config) as session:
-            return await schedule_story(session, issue_key, sprint_id)
-
-    @mcp_server.tool()
-    def proceed(issue_key: str) -> str:
-        """Explicitly approve the coding stage for a user story."""
-        workflow_state.mark_proceed(issue_key)
-        return f"Approved: coding stage unblocked for '{issue_key}'"
-
-    @mcp_server.tool()
-    def create_branch_for_story(
-        issue_key: str,
+    def create_implementation_branch(
+        story_key: str,
         repository_path: str,
-        branch_name: str,
-    ) -> str:
-        """Create a git branch for a story's implementation once approved."""
-        workflow_state.require_approval(issue_key)
-        _create_git_branch(repository_path, branch_name)
-        return (
-            f"Created branch '{branch_name}' in '{repository_path}' for '{issue_key}'"
-        )
-
-    _register_test_verification_tools(mcp_server, workflow_state)
-    _register_pull_request_tools(mcp_server, workflow_state, config)
-    _register_documentation_tools(mcp_server)
-    _register_release_tools(mcp_server, config)
+    ) -> dict[str, str]:
+        """Coding stage: create the story's git branch in the run's repo. PRD §3.6."""
+        return _create_implementation_branch(workflow_state, story_key, repository_path)
 
     return mcp_server
 
 
-def _register_test_verification_tools(
-    mcp_server: FastMCP,
-    workflow_state: WorkflowState,
-) -> None:
-    """Register the test-run and override tools onto the server."""
-
-    @mcp_server.tool()
-    def run_tests_for_story(
-        issue_key: str,
-        repository_path: str,
-        test_command: str,
-    ) -> str:
-        """Run the test suite for a story and report pass/fail results."""
-        result = run_test_suite(repository_path, test_command)
-        workflow_state.record_test_result(issue_key, passed=result.passed)
-        status = "PASSED" if result.passed else "FAILED"
-        return f"Tests {status} for '{issue_key}'\n{result.output}"
-
-    @mcp_server.tool()
-    def override_failed_tests(issue_key: str) -> str:
-        """Explicitly override a failed test run to unblock PR creation."""
-        workflow_state.mark_test_override(issue_key)
-        return f"Test failure override recorded for '{issue_key}'"
-
-
-def _register_pull_request_tools(
-    mcp_server: FastMCP,
-    workflow_state: WorkflowState,
-    config: Config,
-) -> None:
-    """Register the PR-creation tool onto the server."""
-
-    @mcp_server.tool()
-    async def create_pull_request_for_story(
-        issue_key: str,
-        repository: str,
-        head_branch: str,
-        base_branch: str,
-        title: str,
-    ) -> str:
-        """Create a GitHub PR for a story once tests pass, linked to Jira."""
-        workflow_state.require_tests_passed(issue_key)
-        async with github_session(config) as session:
-            return await create_pull_request(
-                session,
-                repository,
-                head_branch,
-                base_branch,
-                issue_key,
-                title,
-            )
-
-
-def _register_documentation_tools(mcp_server: FastMCP) -> None:
-    """Register the README update tool onto the server."""
-
-    @mcp_server.tool()
-    def update_readme_for_story(
-        issue_key: str,
-        repository_path: str,
-        summary: str,
-    ) -> str:
-        """Update the repository's README to reflect a story's changes."""
-        readme_path = _update_readme(repository_path, issue_key, summary)
-        return f"Updated '{readme_path}' with changes for '{issue_key}'"
-
-
-def _register_release_tools(mcp_server: FastMCP, config: Config) -> None:
-    """Register the GitHub Release-creation tool onto the server."""
-
-    @mcp_server.tool()
-    async def create_release_for_completed_work(
-        repository: str,
-        tag_name: str,
-        release_notes: str,
-    ) -> str:
-        """Create a GitHub Release (tag + notes) for completed work."""
-        async with github_session(config) as session:
-            return await create_release(session, repository, tag_name, release_notes)
-
-
 def run_server(config: Config) -> None:
-    """Start the MCP server for this run using the given configuration."""
+    """Start the MCP server for this run using the given configuration. R: Phase 1."""
     server = create_server(config)
     server.run()
