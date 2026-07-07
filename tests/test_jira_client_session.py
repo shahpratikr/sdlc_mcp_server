@@ -7,9 +7,7 @@ from e2e_mcp_server.jira_client import jira_session
 
 TEST_CONFIG = Config(
     jira_mcp_url="http://localhost:9001/mcp",
-    github_mcp_url="http://localhost:9002/mcp",
     jira_api_token="jira-token",  # noqa: S106
-    github_token="github-token",  # noqa: S106
 )
 
 

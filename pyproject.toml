@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "e2e-mcp-server"
 version = "0.1.0"
-description = "E2E Developer Workflow MCP Server: orchestrates Jira grooming, coding, testing, PR creation, docs, and release from a single problem statement."
+description = "E2E Developer Workflow MCP Server: orchestrates Jira grooming and pre-coding branch setup from a single problem statement."
 authors = ["Pratik Shah <shahpratikrajesh@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "e2e_mcp_server", from = "src" }]

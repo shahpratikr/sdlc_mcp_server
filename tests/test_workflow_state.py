@@ -1,80 +1,67 @@
-import pytest
+"""Tests for the Phase 3/5/6 workflow state gates. docs/ARCHITECTURE.md Phase 3/5/6."""
 
-from e2e_mcp_server.workflow_state import (
-    ApprovalGateError,
-    TestGateError,
-    WorkflowState,
-)
+from e2e_mcp_server.workflow_state import WorkflowState
 
 
-def test_story_is_not_approved_by_default():
-    """Coding must not start until 'proceed' has been called."""
+def test_feature_is_not_approved_by_default():
     state = WorkflowState()
-    assert state.is_approved("PROJ-1") is False
+    assert state.is_feature_approved("PROJ-1") is False
 
 
-def test_mark_proceed_approves_the_story():
-    """'proceed' explicitly approves coding for a story."""
+def test_approve_feature_marks_it_approved():
     state = WorkflowState()
-    state.mark_proceed("PROJ-1")
-    assert state.is_approved("PROJ-1") is True
+    state.approve_feature("PROJ-1")
+    assert state.is_feature_approved("PROJ-1") is True
 
 
-def test_mark_proceed_does_not_approve_other_stories():
-    """Approval gate is tracked per user story."""
+def test_approving_one_feature_does_not_approve_another():
     state = WorkflowState()
-    state.mark_proceed("PROJ-1")
-    assert state.is_approved("PROJ-2") is False
+    state.approve_feature("PROJ-1")
+    assert state.is_feature_approved("PROJ-2") is False
 
 
-def test_require_approval_raises_when_not_approved():
-    """coding-stage tools are blocked until 'proceed' is called."""
+def test_story_set_is_not_approved_by_default():
     state = WorkflowState()
-    with pytest.raises(ApprovalGateError):
-        state.require_approval("PROJ-1")
+    assert state.is_story_set_approved("PROJ-1") is False
 
 
-def test_require_approval_passes_once_approved():
-    """Once approved, coding-stage actions are unblocked."""
+def test_approve_story_set_marks_it_approved():
     state = WorkflowState()
-    state.mark_proceed("PROJ-1")
-    state.require_approval("PROJ-1")
+    state.approve_story_set("PROJ-1")
+    assert state.is_story_set_approved("PROJ-1") is True
 
 
-def test_require_tests_passed_allows_when_no_run_recorded():
-    """PR gate is only enforced once a test result is on record."""
+def test_reject_story_set_clears_approval():
     state = WorkflowState()
-    state.require_tests_passed("PROJ-1")
+    state.approve_story_set("PROJ-1")
+    state.reject_story_set("PROJ-1")
+    assert state.is_story_set_approved("PROJ-1") is False
 
 
-def test_require_tests_passed_allows_when_tests_passed():
-    """PR creation proceeds once tests pass."""
+def test_reject_story_set_is_safe_when_not_previously_approved():
     state = WorkflowState()
-    state.record_test_result("PROJ-1", passed=True)
-    state.require_tests_passed("PROJ-1")
+    state.reject_story_set("PROJ-1")
+    assert state.is_story_set_approved("PROJ-1") is False
 
 
-def test_require_tests_passed_blocks_when_tests_failed():
-    """PR creation is blocked on a failed test run."""
+def test_approving_one_feature_story_set_does_not_approve_another():
     state = WorkflowState()
-    state.record_test_result("PROJ-1", passed=False)
-    with pytest.raises(TestGateError):
-        state.require_tests_passed("PROJ-1")
+    state.approve_story_set("PROJ-1")
+    assert state.is_story_set_approved("PROJ-2") is False
 
 
-def test_require_tests_passed_allows_when_override_recorded():
-    """An explicit developer override unblocks PR creation."""
+def test_story_has_not_proceeded_by_default():
     state = WorkflowState()
-    state.record_test_result("PROJ-1", passed=False)
-    state.mark_test_override("PROJ-1")
-    state.require_tests_passed("PROJ-1")
+    assert state.has_proceeded("PROJ-1") is False
 
 
-def test_recording_new_test_result_clears_prior_override():
-    """A fresh test run resets any previous override."""
+def test_proceed_marks_story_as_proceeded():
     state = WorkflowState()
-    state.record_test_result("PROJ-1", passed=False)
-    state.mark_test_override("PROJ-1")
-    state.record_test_result("PROJ-1", passed=False)
-    with pytest.raises(TestGateError):
-        state.require_tests_passed("PROJ-1")
+    state.proceed("PROJ-1")
+    assert state.has_proceeded("PROJ-1") is True
+
+
+def test_proceeding_one_story_does_not_proceed_another():
+    state = WorkflowState()
+    state.proceed("PROJ-1")
+    assert state.has_proceeded("PROJ-2") is False
