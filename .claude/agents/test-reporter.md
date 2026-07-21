@@ -16,9 +16,12 @@ You do NOT modify files. You do NOT fix failures. You report only.
 ## Inputs provided by the parent
 - phase_number: the phase being validated (for report header only)
 
+## Step 0 — Preconditions
+If CLAUDE.md does not exist, output exactly: `ERROR: CLAUDE.md not found — cannot determine test command.` and stop.
+
 ## Task
 1. Read CLAUDE.md.
-   Find the test command (look for "Test:", "test:", or "npm test" equivalent).
+   Find the test command listed under its Commands section (an explicit "Test:" entry). Do not guess or substitute a different tool's command (e.g. assuming "npm test" for a non-Node project) — if no test command is listed, output exactly: `ERROR: no test command found in CLAUDE.md.` and stop.
 
 2. Run the test command.
    Capture stdout and stderr.
