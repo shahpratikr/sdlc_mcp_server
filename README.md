@@ -33,11 +33,37 @@ Test execution, pull request creation, documentation updates, and release creati
 ## Prerequisites
 
 - Python 3.14 and [Poetry](https://python-poetry.org/) installed.
-- For Jira runs: a running instance of the official Atlassian/Jira MCP server, reachable at a URL you control, and a Jira API token (PAT) with permission to create and update issues in your target project.
-- For GitHub runs: a running instance of an official GitHub MCP server, reachable at a URL you control, and a GitHub PAT with permission to create and update issues in your target repository.
+- For Jira runs: a running instance of the official Atlassian/Jira MCP server, reachable at a URL you control, and a Jira API token (PAT) with permission to create and update issues in your target project (see PAT permissions below).
+- For GitHub runs: a running instance of an official GitHub MCP server, reachable at a URL you control, and a GitHub PAT with permission to create and update issues in your target repository (see PAT permissions below).
 - A local git repository already cloned.
 - An MCP-compatible AI assistant (Claude Code) to act as the client driving these tools. Only Claude Sonnet or Claude Haiku are approved for this use.
 - An AI assistant/MCP client that supports the MCP **sampling** capability. Stage 1 and Stage 2 tools generate acceptance criteria, story splits, and (Jira only) estimates by requesting completions from the client over sampling; without it, those tools fail.
+
+## PAT permissions
+
+Both tokens are bearer credentials sent to their respective *official* MCP server (never to this server directly, and never to the Jira/GitHub REST APIs directly). Scope each one to the minimum this workflow actually needs.
+
+### Jira API token (`JIRA_API_TOKEN`)
+
+This server only creates and updates Features/stories in the project you specify — it never reads or writes anything else in your Jira instance. Scope the token's underlying account to:
+
+- **Browse projects** — to look up and validate the target project key.
+- **Create issues** — to create the Feature (Stage 1) and each story (Stage 2).
+- **Edit issues** — to update acceptance criteria text (Stage 1 approval-gate edits) and to write story point estimates.
+- **Schedule issues** / **Manage sprints** (board-level permission) — to assign created stories into the sprint specified in Stage 2. Skip this if you only ever plan to use `tracker: jira` without sprint scheduling, but Stage 2 requires it whenever `sprint` is supplied.
+- **Assign issues** — only needed if you pass a `default_assignee` in Stage 2.
+
+Restrict the token to the specific project(s) you'll target with this tool, not a site-wide admin scope. If your org uses Atlassian's OAuth-based remote MCP server (see below) instead of a classic API token, grant the equivalent OAuth scopes (`read:jira-work`, `write:jira-work`) during the one-time authorization instead of provisioning a separate PAT.
+
+### GitHub PAT (`GITHUB_API_TOKEN`)
+
+This server only creates and updates Issues in the repository you specify — it never touches code, branches, or other repository content through this token (the git branch created in Stage 3 uses your local git credentials, not this PAT). Scope a fine-grained PAT to:
+
+- **Repository access**: the specific repository/repositories you'll target, not all repositories.
+- **Issues: Read and write** — to create the parent feature Issue and child story Issues, update AC text on approval-gate edits, and set assignees.
+- **Metadata: Read** (fine-grained PATs require this alongside any other permission) — to resolve labels and repo details.
+
+A classic PAT with the `repo` scope also works but is broader than necessary, since `repo` also grants code/branch/webhook access this server never uses. Prefer a fine-grained PAT scoped as above. No `admin:org`, `workflow`, or `write:packages` scopes are needed for anything this server does.
 
 ## Installation
 
