@@ -66,7 +66,11 @@ def test_create_implementation_branch_requires_proceed(tmp_path):
         asyncio.run(
             server.call_tool(
                 "create_implementation_branch",
-                {"story_key": "PROJ-2", "repository_path": str(repo_path)},
+                {
+                    "story_key": "PROJ-2",
+                    "tracker": "jira",
+                    "repository_path": str(repo_path),
+                },
             ),
         )
 
@@ -75,11 +79,15 @@ def test_create_implementation_branch_creates_branch_after_proceed(tmp_path):
     server = create_server(TEST_CONFIG)
     repo_path = _init_repo(tmp_path)
 
-    asyncio.run(server.call_tool("proceed", {"story_key": "PROJ-2"}))
+    asyncio.run(server.call_tool("proceed", {"story_key": "PROJ-2", "tracker": "jira"}))
     result = asyncio.run(
         server.call_tool(
             "create_implementation_branch",
-            {"story_key": "PROJ-2", "repository_path": str(repo_path)},
+            {
+                    "story_key": "PROJ-2",
+                    "tracker": "jira",
+                    "repository_path": str(repo_path),
+                },
         ),
     )
     text = _result_text(result)
@@ -94,3 +102,47 @@ def test_create_implementation_branch_creates_branch_after_proceed(tmp_path):
         text=True,
     ).stdout.strip()
     assert branch == "story/proj-2"
+
+
+def test_create_implementation_branch_raises_git_branch_error_on_failure(tmp_path):
+    server = create_server(TEST_CONFIG)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    asyncio.run(server.call_tool("proceed", {"story_key": "PROJ-2", "tracker": "jira"}))
+    with pytest.raises(Exception, match="git branch creation failed"):
+        asyncio.run(
+            server.call_tool(
+                "create_implementation_branch",
+                {
+                    "story_key": "PROJ-2",
+                    "tracker": "jira",
+                    "repository_path": str(not_a_repo),
+                },
+            ),
+        )
+
+
+def test_create_implementation_branch_creates_branch_after_proceed_for_github(tmp_path):
+    server = create_server(TEST_CONFIG)
+    repo_path = _init_repo(tmp_path)
+
+    asyncio.run(server.call_tool("proceed", {"story_key": "2", "tracker": "github"}))
+    result = asyncio.run(
+        server.call_tool(
+            "create_implementation_branch",
+            {"story_key": "2", "tracker": "github", "repository_path": str(repo_path)},
+        ),
+    )
+    text = _result_text(result)
+    assert "story/2" in text
+    assert "created" in text
+
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=repo_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert branch == "story/2"

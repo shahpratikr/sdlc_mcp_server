@@ -45,6 +45,24 @@ def test_get_feature_acceptance_criteria_raises_on_unparseable_response():
         asyncio.run(get_feature_acceptance_criteria(session, "PROJ-1"))
 
 
+def test_get_feature_acceptance_criteria_raises_when_no_text_content():
+    session = _fake_session(None)
+
+    with pytest.raises(JiraClientError, match="did not contain text content"):
+        asyncio.run(get_feature_acceptance_criteria(session, "PROJ-1"))
+
+
+def test_project_key_from_issue_key_raises_on_malformed_key():
+    with pytest.raises(JiraClientError, match="not a valid Jira issue key"):
+        project_key_from_issue_key("NoHyphenAtAll")
+
+    with pytest.raises(JiraClientError, match="not a valid Jira issue key"):
+        project_key_from_issue_key("PROJ-")
+
+    with pytest.raises(JiraClientError, match="not a valid Jira issue key"):
+        project_key_from_issue_key("-42")
+
+
 def test_create_story_calls_create_issue_and_returns_key():
     session = _fake_session(json.dumps({"key": "PROJ-2"}))
 

@@ -20,7 +20,10 @@ def test_approving_story_set_returns_approved_status():
     server = create_server(TEST_CONFIG)
 
     result = asyncio.run(
-        server.call_tool("approve_story_set", {"feature_key": "PROJ-1"}),
+        server.call_tool(
+            "approve_story_set",
+            {"feature_key": "PROJ-1", "tracker": "jira"},
+        ),
     )
     text = _result_text(result)
     assert "PROJ-1" in text
@@ -33,9 +36,23 @@ def test_requesting_regeneration_returns_regeneration_status():
     result = asyncio.run(
         server.call_tool(
             "approve_story_set",
-            {"feature_key": "PROJ-1", "regenerate": True},
+            {"feature_key": "PROJ-1", "tracker": "jira", "regenerate": True},
         ),
     )
     text = _result_text(result)
     assert "PROJ-1" in text
     assert "regeneration_requested" in text
+
+
+def test_approving_github_story_set_returns_approved_status():
+    server = create_server(TEST_CONFIG)
+
+    result = asyncio.run(
+        server.call_tool(
+            "approve_story_set",
+            {"feature_key": "1", "tracker": "github"},
+        ),
+    )
+    text = _result_text(result)
+    assert "1" in text
+    assert "approved" in text

@@ -41,6 +41,14 @@ def test_generate_user_stories_rejects_non_text_content():
         asyncio.run(generate_user_stories(ctx, "- feature AC one"))
 
 
+def test_generate_user_stories_skips_blank_lines_between_entries():
+    ctx = _fake_ctx(TextContent(type="text", text="- Story one\n\n- Story two\n"))
+
+    stories = asyncio.run(generate_user_stories(ctx, "- feature AC one"))
+
+    assert stories == ["Story one", "Story two"]
+
+
 def test_generate_user_stories_rejects_empty_result():
     ctx = _fake_ctx(TextContent(type="text", text="   \n  "))
 

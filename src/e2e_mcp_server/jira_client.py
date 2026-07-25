@@ -73,7 +73,11 @@ async def update_feature_acceptance_criteria(
 
 def project_key_from_issue_key(issue_key: str) -> str:
     """Derive a Jira project key from an issue key such as 'PROJ-1'. PRD §3.3."""
-    return issue_key.split("-", maxsplit=1)[0]
+    prefix, sep, rest = issue_key.partition("-")
+    if not sep or not prefix or not rest:
+        msg = f"'{issue_key}' is not a valid Jira issue key (expected format 'PROJ-123')"
+        raise JiraClientError(msg)
+    return prefix
 
 
 async def get_feature_acceptance_criteria(
@@ -137,7 +141,13 @@ async def schedule_story_into_sprint(
     board: str,
     sprint: str,
 ) -> None:
-    """Schedule a Jira Story into the given board and sprint. PRD §3.3."""
+    """Schedule a Jira Story into the given board and sprint. PRD §3.3.
+
+    `board` and `sprint` are passed through opaquely to the Jira MCP server's
+    `scheduleIssue` tool with no format validation on this side — whether they're
+    expected to be Jira's numeric board/sprint IDs or human-readable names depends
+    entirely on that server's own `scheduleIssue` schema.
+    """
     await session.call_tool(
         "scheduleIssue",
         {

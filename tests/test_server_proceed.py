@@ -20,8 +20,19 @@ def test_proceed_returns_proceeded_status():
     server = create_server(TEST_CONFIG)
 
     result = asyncio.run(
-        server.call_tool("proceed", {"story_key": "PROJ-2"}),
+        server.call_tool("proceed", {"story_key": "PROJ-2", "tracker": "jira"}),
     )
     text = _result_text(result)
     assert "PROJ-2" in text
+    assert "proceeded" in text
+
+
+def test_proceed_returns_proceeded_status_for_github():
+    server = create_server(TEST_CONFIG)
+
+    result = asyncio.run(
+        server.call_tool("proceed", {"story_key": "2", "tracker": "github"}),
+    )
+    text = _result_text(result)
+    assert "2" in text
     assert "proceeded" in text

@@ -37,3 +37,10 @@ def test_create_feature_raises_on_unparseable_response():
 
     with pytest.raises(JiraClientError):
         asyncio.run(create_feature(session, "PROJ", "Users need X", "- AC one"))
+
+
+def test_create_feature_raises_when_response_has_no_text_content():
+    session = _fake_session(None)
+
+    with pytest.raises(JiraClientError, match="did not contain text content"):
+        asyncio.run(create_feature(session, "PROJ", "Users need X", "- AC one"))

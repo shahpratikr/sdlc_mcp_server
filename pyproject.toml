@@ -9,7 +9,7 @@ packages = [{ include = "e2e_mcp_server", from = "src" }]
 [tool.poetry.dependencies]
 mcp = "~1.28.1"
 pre-commit = "~4.6.0"
-python = "~3.14"
+python = "^3.11"
 typer = "~0.26.8"
 
 [tool.poetry.group.dev.dependencies]

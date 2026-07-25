@@ -44,6 +44,7 @@ def test_start_feature_generates_ac_and_creates_jira_feature():
                 {
                     "problem_statement": "Users need faster checkout",
                     "project_key": "PROJ",
+                    "tracker": "jira",
                 },
             )
             fake_generate.assert_awaited_once()
@@ -59,4 +60,50 @@ def test_start_feature_generates_ac_and_creates_jira_feature():
     result = asyncio.run(_run())
     text = _result_text(result)
     assert "PROJ-42" in text
+    assert "AC one" in text
+
+
+def test_start_feature_generates_ac_and_creates_github_issue():
+    server = create_server(TEST_CONFIG)
+    fake_session = object()
+
+    @asynccontextmanager
+    async def _fake_github_session(config):
+        assert config is TEST_CONFIG
+        yield fake_session
+
+    async def _run():
+        with (
+            patch(
+                "e2e_mcp_server.server.generate_feature_acceptance_criteria",
+                AsyncMock(return_value="- AC one\n- AC two"),
+            ) as fake_generate,
+            patch("e2e_mcp_server.server.github_session", _fake_github_session),
+            patch(
+                "e2e_mcp_server.server.create_feature_issue",
+                AsyncMock(return_value="42"),
+            ) as fake_create_feature_issue,
+        ):
+            result = await server.call_tool(
+                "start_feature",
+                {
+                    "problem_statement": "Users need faster checkout",
+                    "tracker": "github",
+                    "repo_owner": "improving",
+                    "repo_name": "widgets",
+                },
+            )
+            fake_generate.assert_awaited_once()
+            fake_create_feature_issue.assert_awaited_once_with(
+                fake_session,
+                "improving",
+                "widgets",
+                "Users need faster checkout",
+                "- AC one\n- AC two",
+            )
+            return result
+
+    result = asyncio.run(_run())
+    text = _result_text(result)
+    assert "42" in text
     assert "AC one" in text

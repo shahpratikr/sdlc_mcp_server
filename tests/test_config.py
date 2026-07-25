@@ -8,10 +8,14 @@ REQUIRED_VARS = {
     "JIRA_MCP_URL": "http://localhost:9001/mcp",
     "JIRA_API_TOKEN": "jira-token",
 }
+OPTIONAL_VARS = {
+    "GITHUB_MCP_URL": "http://localhost:9002/mcp",
+    "GITHUB_API_TOKEN": "github-token",
+}
 
 
 def _clear_env(monkeypatch):
-    for key in REQUIRED_VARS:
+    for key in {**REQUIRED_VARS, **OPTIONAL_VARS}:
         monkeypatch.delenv(key, raising=False)
 
 
@@ -36,3 +40,25 @@ def test_load_config_missing_var_raises(monkeypatch, missing_var):
 
     with pytest.raises(ConfigError):
         load_config()
+
+
+def test_load_config_github_fields_default_to_none_when_unset(monkeypatch):
+    _clear_env(monkeypatch)
+    for key, value in REQUIRED_VARS.items():
+        monkeypatch.setenv(key, value)
+
+    config = load_config()
+
+    assert config.github_mcp_url is None
+    assert config.github_api_token is None
+
+
+def test_load_config_reads_optional_github_fields_when_set(monkeypatch):
+    _clear_env(monkeypatch)
+    for key, value in {**REQUIRED_VARS, **OPTIONAL_VARS}.items():
+        monkeypatch.setenv(key, value)
+
+    config = load_config()
+
+    assert config.github_mcp_url == OPTIONAL_VARS["GITHUB_MCP_URL"]
+    assert config.github_api_token == OPTIONAL_VARS["GITHUB_API_TOKEN"]
